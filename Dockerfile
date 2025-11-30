@@ -1,18 +1,24 @@
 FROM python:3.10-slim
 
-# Install Chrome
-RUN apt-get update && apt-get install -y wget gnupg unzip \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
-       > /etc/apt/sources.list.d/google.list \
-    && apt-get update && apt-get install -y google-chrome-stable
+# Install dependencies
 
-# Install Python libs
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y \
+curl \
+unzip \
+&& rm -rf /var/lib/apt/lists/*
 
-# Copy worker code
-COPY worker.py /app/worker.py
+# Set work directory
+
 WORKDIR /app
 
-CMD ["python", "worker.py"]
+# Copy files
+
+COPY requirements.txt requirements.txt
+COPY [worker.py](http://worker.py/) [worker.py](http://worker.py/)
+COPY keywords.txt keywords.txt
+
+# Install Python dependencies
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+CMD ["python", "[worker.py](http://worker.py/)"]
