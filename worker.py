@@ -44,7 +44,7 @@ def check_brand_search(keyword, is_mobile=False):
     brand_block = soup.find("div", class_="brand_block")
 
     if brand_block:
-        return "☑️ 정상노출"
+        return "✅ 정상노출"
     else:
         return "❌ 미노출"
 
@@ -97,4 +97,5 @@ def main():
 # ==========================
 if __name__ == "__main__":
     main()
+
 
