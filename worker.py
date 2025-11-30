@@ -1,52 +1,110 @@
-import time
 import requests
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
+import os
+from datetime import datetime
 
-SLACK_WEBHOOK = "YOUR_WEBHOOK_URL"
+# ==========================
 
-PC_URL = "https://search.naver.com/search.naver?query="
-MO_URL = "https://m.search.naver.com/search.naver?query="
+# 환경 변수
 
-# 키워드 파일 읽기
-def load_keywords():
-    with open("keywords.txt", "r", encoding="utf-8") as f:
-        keywords = [line.strip() for line in f if line.strip()]
-    return keywords
+# ==========================
 
-def send_slack(msg):
-    if SLACK_WEBHOOK:
-        requests.post(SLACK_WEBHOOK, json={"text": msg})
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
-def check_brand(keyword, url, device):
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+NAVER_PC_URL = "[https://search.naver.com/search.naver?query={}](https://search.naver.com/search.naver?query=%7B%7D)"
+NAVER_MO_URL = "[https://m.search.naver.com/search.naver?query={}](https://m.search.naver.com/search.naver?query=%7B%7D)"
 
-    # 모바일 user-agent 적용
-    if device == "MO":
-        options.add_argument(
-            "--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) "
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
-        )
+HEADER_PC = {
+"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+}
+HEADER_MO = {
+"User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
+}
 
-    driver = webdriver.Chrome(options=options)
-    driver.get(url + keyword)
-    time.sleep(2)
+# ==========================
 
-    try:
-        driver.find_element(By.CSS_SELECTOR, "._cs_brand")
-        print(f"[OK] {keyword} / {device} 브랜드검색 있음")
-    except:
-        print(f"[NO] {keyword} / {device} 브랜드검색 없음")
-        send_slack(f"❗브랜드검색 미노출: {keyword} ({device})")
+# 브랜드 검색 노출 여부 확인
 
-    driver.quit()
+# ==========================
 
-if __name__ == "__main__":
-    keywords = load_keywords()   # ← keywords.txt 내용 불러오기
-    for kw in keywords:
-        check_brand(kw, PC_URL, "PC")
-        check_brand(kw, MO_URL, "MO")
+def check_brand_search(keyword: str, device: str) -> bool:
+"""브랜드검색이 있는지 brand_block/div id=brand_area 기반으로 판별"""
+
+```
+if device == "PC":
+    url = NAVER_PC_URL.format(keyword)
+    header = HEADER_PC
+else:
+    url = NAVER_MO_URL.format(keyword)
+    header = HEADER_MO
+
+html = requests.get(url, headers=header).text
+soup = BeautifulSoup(html, "html.parser")
+
+# 브랜드검색 광고는 아래 요소가 반드시 포함됨
+exists = (
+    soup.find("div", class_="brand_block") or
+    soup.find("div", id="brand_area")
+)
+
+return True if exists else False
+
+```
+
+# ==========================
+
+# Slack 메시지 전송
+
+# ==========================
+
+def send_slack(message: str):
+if not SLACK_WEBHOOK_URL:
+print("SLACK_WEBHOOK_URL is missing.")
+return
+
+```
+requests.post(
+    SLACK_WEBHOOK_URL,
+    json={"text": message}
+)
+
+```
+
+# ==========================
+
+# MAIN
+
+# ==========================
+
+def main():
+now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+```
+with open("keywords.txt", "r", encoding="utf-8") as f:
+    keywords = [k.strip() for k in f.readlines() if k.strip()]
+
+pc_results = []
+mo_results = []
+
+for kw in keywords:
+    pc_ok = check_brand_search(kw, "PC")
+    mo_ok = check_brand_search(kw, "MO")
+
+    pc_results.append(f"{kw} ({'✅ 정상노출' if pc_ok else '❌ 미노출'})")
+    mo_results.append(f"{kw} ({'✅ 정상노출' if mo_ok else '❌ 미노출'})")
+
+# 최종 슬랙 메시지
+slack_message = (
+    f"📢 *BGROW - Naver Brand Search Monitoring*\\n"
+    f"⏱ {now}\\n\\n"
+    f"*[PC]*\\n" + "\\n".join(pc_results) +
+    "\\n\\n*[MO]*\\n" + "\\n".join(mo_results)
+)
+
+print(slack_message)
+send_slack(slack_message)
+
+```
+
+if **name** == "**main**":
+main()
